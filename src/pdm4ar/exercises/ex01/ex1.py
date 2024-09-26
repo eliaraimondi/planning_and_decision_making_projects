@@ -21,4 +21,9 @@ def compare_lexicographic(a: Tuple[float], b: Tuple[float]) -> ComparisonOutcome
     but more important than the one in position 2
     """
     # todo: implement the comparison
+    for index, number in enumerate(a):
+        if number < b[index]:
+            return FIRST_PREFERRED
+        elif number > b[index]:
+            return SECOND_PREFERRED
     return INDIFFERENT
