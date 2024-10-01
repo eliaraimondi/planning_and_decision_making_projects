@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-import heapq
-from tracemalloc import stop  # you may find this helpful
+import heapq  # you may find this helpful
 
 from numpy import arcsin
 from osmnx.distance import great_circle_vec
@@ -92,7 +91,11 @@ class Astar(InformedGraphSearch):
 
         distance = great_circle_vec(coord_u[0], coord_u[1], coord_v[0], coord_v[1], earth_radius=6371009)
 
-        speed = TravelSpeed.HIGHWAY.value
+        if distance < 600:
+            speed = TravelSpeed.SECONDARY.value
+        else:
+            speed = TravelSpeed.HIGHWAY.value
+
         time_to_travel = distance / speed
 
         return time_to_travel
