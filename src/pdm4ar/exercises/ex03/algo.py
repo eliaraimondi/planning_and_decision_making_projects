@@ -1,8 +1,11 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-import heapq    # you may find this helpful
+import heapq
+from tracemalloc import stop  # you may find this helpful
 
+from numpy import arcsin
 from osmnx.distance import great_circle_vec
+from zmq import NULL
 
 from pdm4ar.exercises.ex02.structures import X, Path
 from pdm4ar.exercises.ex03.structures import WeightedGraph, TravelSpeed
@@ -17,11 +20,47 @@ class InformedGraphSearch(ABC):
         # Abstract function. Nothing to do here.
         pass
 
+
 @dataclass
 class UniformCostSearch(InformedGraphSearch):
     def path(self, start: X, goal: X) -> Path:
-        # todo
-        pass
+        queque = [start]
+        costToReach = {}
+        for node in list(self.graph.adj_list.keys()):
+            costToReach[node] = 10000000
+        costToReach[start] = 0
+
+        parent = {start: NULL}
+
+        while queque:
+            min_val = 1000000000
+            for node in queque:
+                if costToReach[node] < min_val:
+                    min_val = costToReach[node]
+                    s = node
+
+            if s == goal:
+                return self.compute_path(s, parent, start)
+
+            for next_node in self.graph.adj_list[s]:
+                if self.graph.get_weight(s, next_node) is not None:
+                    newCostToReach = costToReach[s] + self.graph.get_weight(s, next_node)
+                if newCostToReach < costToReach[next_node]:
+                    costToReach[next_node] = newCostToReach
+                    parent[next_node] = s  # type: ignore
+                    if next_node not in queque:
+                        queque = queque + [next_node]
+
+            queque.remove(s)  # type: ignore
+
+    def compute_path(self, last_node, pre, start):
+        ins = last_node
+        path = []
+        while ins != start:
+            path = [ins] + path
+            ins = pre[ins]
+        return [start] + path
+
 
 @dataclass
 class Astar(InformedGraphSearch):
@@ -48,12 +87,60 @@ class Astar(InformedGraphSearch):
     def _INTERNAL_heuristic(self, u: X, v: X) -> float:
         # Implement your heuristic here. Your `path` function should NOT call
         # this function directly. Rather, it should call `heuristic`
-        # todo
-        return 0
-        
+        coord_u = self.graph.get_node_coordinates(u)
+        coord_v = self.graph.get_node_coordinates(v)
+
+        distance = great_circle_vec(coord_u[0], coord_u[1], coord_v[0], coord_v[1], earth_radius=6371009)
+
+        speed = TravelSpeed.SECONDARY.value
+        time_to_travel = distance / speed
+
+        return time_to_travel
+
     def path(self, start: X, goal: X) -> Path:
-        # todo
+        queque = [start]
+        heapq.heapify(queque)
+        costToReach = {}
+        for node in list(self.graph.adj_list.keys()):
+            costToReach[node] = 10000000
+        costToReach[start] = 0
+        distances = {start: self.heuristic(start, goal)}
+
+        parent = {start: NULL}
+
+        while queque:
+            min_val = 1000000000
+            for node in queque:
+                if (costToReach[node] + distances[node]) < min_val:
+                    min_val = costToReach[node] + distances[node]
+                    s = node
+
+            if s == goal:
+                return self.compute_path(s, parent, start)
+
+            for next_node in self.graph.adj_list[s]:
+                weight = self.graph.get_weight(s, next_node)
+                if weight is not None:
+                    newCostToReach = costToReach[s] + weight
+                if newCostToReach < costToReach[next_node]:
+                    costToReach[next_node] = newCostToReach
+                    parent[next_node] = s  # type: ignore
+                    if next_node not in queque:
+                        queque = queque + [next_node]
+                        if next_node not in distances:
+                            distances[next_node] = self.heuristic(next_node, goal)
+
+            queque.remove(s)  # type: ignore
+
         return []
+
+    def compute_path(self, last_node, pre, start):
+        ins = last_node
+        path = []
+        while ins != start:
+            path = [ins] + path
+            ins = pre[ins]
+        return [start] + path
 
 
 def compute_path_cost(wG: WeightedGraph, path: Path):
@@ -63,5 +150,5 @@ def compute_path_cost(wG: WeightedGraph, path: Path):
     total: float = 0
     for i in range(1, len(path)):
         inc = wG.get_weight(path[i - 1], path[i])
-        total += inc
+        total += inc  # type: ignore
     return total
