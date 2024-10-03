@@ -91,7 +91,9 @@ class Astar(InformedGraphSearch):
 
         distance = great_circle_vec(coord_u[0], coord_u[1], coord_v[0], coord_v[1], earth_radius=6371009)
 
-        if distance < 600:
+        if distance < 400:
+            speed = TravelSpeed.CITY.value
+        elif distance < 800:
             speed = TravelSpeed.SECONDARY.value
         else:
             speed = TravelSpeed.HIGHWAY.value
