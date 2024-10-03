@@ -103,7 +103,7 @@ class Astar(InformedGraphSearch):
             TravelSpeed.SECONDARY.value,
             TravelSpeed.HIGHWAY.value,
         ]
-        value = 1.2
+        value = 1.3
         speed = sum(speeds) / len(speeds) * value
 
         time_to_travel = distance / speed
