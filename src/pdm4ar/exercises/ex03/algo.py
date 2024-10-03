@@ -95,16 +95,16 @@ class Astar(InformedGraphSearch):
         # if distance < 600:
         #   speed = TravelSpeed.SECONDARY.value
         # else:
-        #    speed = TravelSpeed.HIGHWAY.value
+        # speed = TravelSpeed.HIGHWAY.value
 
         speeds = [
-            TravelSpeed.CITY.value,
-            TravelSpeed.PEDESTRIAN.value,
-            TravelSpeed.SECONDARY.value,
-            TravelSpeed.HIGHWAY.value,
+            TravelSpeed.HIGHWAY.value * 5,
+            TravelSpeed.SECONDARY.value * 3,
+            TravelSpeed.CITY.value * 1.5,
+            TravelSpeed.PEDESTRIAN.value * 0.5,
         ]
         value = 1.3
-        speed = sum(speeds) / len(speeds) * value
+        speed = sum(speeds) / 10
 
         time_to_travel = distance / speed
 
