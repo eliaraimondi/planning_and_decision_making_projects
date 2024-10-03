@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import heapq  # you may find this helpful
 
+from cvxpy import mean
 from numpy import arcsin
 from osmnx.distance import great_circle_vec
 from zmq import NULL
@@ -91,10 +92,19 @@ class Astar(InformedGraphSearch):
 
         distance = great_circle_vec(coord_u[0], coord_u[1], coord_v[0], coord_v[1], earth_radius=6371009)
 
-        if distance < 600:
-            speed = TravelSpeed.SECONDARY.value
-        else:
-            speed = TravelSpeed.HIGHWAY.value
+        # if distance < 600:
+        #   speed = TravelSpeed.SECONDARY.value
+        # else:
+        #    speed = TravelSpeed.HIGHWAY.value
+
+        speeds = [
+            TravelSpeed.CITY.value,
+            TravelSpeed.PEDESTRIAN.value,
+            TravelSpeed.SECONDARY.value,
+            TravelSpeed.HIGHWAY.value,
+        ]
+        value = 1.2
+        speed = sum(speeds) / len(speeds) * value
 
         time_to_travel = distance / speed
 
