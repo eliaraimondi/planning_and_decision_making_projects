@@ -12,7 +12,6 @@ class GraphSearch(ABC):
         :param goal: The goal state (i.e. a node)
         :return: The path from start to goal as a Sequence of states, None if a path does not exist
         """
-        # pass
 
 
 class DepthFirst(GraphSearch):
@@ -75,39 +74,33 @@ class BreadthFirst(GraphSearch):
 
 class IterativeDeepening(GraphSearch):
     def search(self, graph: AdjacencyList, start: X, goal: X) -> tuple[Path, OpenedNodes]:
-        for d in range(len(graph) + 1):
+        a = 0
+        for d in range(len(graph)):
             queque = [start]
             opened_nodes = []
             pre = {}
-            max_depth = 0
+            distance = {start: 0}
 
-            while len(queque) != 0 and max_depth < d:
+            while len(queque) != 0 and min(distance[x] for x in queque) <= d:
                 node = queque[0]
                 opened_nodes.append(node)
                 queque.pop(0)
 
                 if node == goal:
                     return self.compute_path(node, pre, start), opened_nodes
+
                 news = []
-
                 for next_node in graph[node]:
-                    old = -1
                     try:
-                        old = pre[next_node]
+                        if distance[next_node] >= (distance[node] + 1):
+                            distance[next_node] = distance[node] + 1
                     except KeyError:
-                        pass
-
-                    pre[next_node] = node
-                    if (
-                        next_node not in opened_nodes
-                        and next_node not in queque
-                        and len(self.compute_path(next_node, pre, start)) <= d
-                    ):
-                        news.append(next_node)
-                    elif old == -1:
-                        pre.pop(next_node)
-                    else:
-                        pre[next_node] = old
+                        distance[next_node] = distance[node] + 1
+                    if next_node not in opened_nodes and next_node not in queque and distance[next_node] < d:
+                        news.append(
+                            next_node
+                        )  # if the node hasn't been opened yet and is distance is <= d so add in queque
+                        pre[next_node] = node
 
                 news.sort()
                 queque = news + queque
