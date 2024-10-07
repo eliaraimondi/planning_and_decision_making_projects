@@ -89,22 +89,14 @@ class Astar(InformedGraphSearch):
         # this function directly. Rather, it should call `heuristic`
         coord_u = self.graph.get_node_coordinates(u)
         coord_v = self.graph.get_node_coordinates(v)
-
         distance = great_circle_vec(coord_u[0], coord_u[1], coord_v[0], coord_v[1], earth_radius=6371009)
-
-        # if distance < 600:
-        #   speed = TravelSpeed.SECONDARY.value
-        # else:
-        # speed = TravelSpeed.HIGHWAY.value
-
         speeds = [
             TravelSpeed.HIGHWAY.value * 5,
             TravelSpeed.SECONDARY.value * 3,
             TravelSpeed.CITY.value * 1.5,
             TravelSpeed.PEDESTRIAN.value * 0.5,
         ]
-        value = 1.3
-        speed = sum(speeds) / 10
+        speed = sum(speeds) / 30
 
         time_to_travel = distance / speed
 
@@ -141,7 +133,7 @@ class Astar(InformedGraphSearch):
                     if next_node not in queque:
                         queque = queque + [next_node]
                         if next_node not in distances:
-                            distances[next_node] = self.heuristic(next_node, goal)
+                            distances[next_node] = self.heuristic(next_node, goal) / 3
 
             queque.remove(s)  # type: ignore
 
