@@ -30,7 +30,6 @@ class ValueIteration(GridMdpSolver):
 
         for state in coordinate:
             # define next_states
-
             if grid_mdp.grid[state] == 0:
                 next_states[state] = [state]
             else:
@@ -52,33 +51,36 @@ class ValueIteration(GridMdpSolver):
             stage_rewards[state] = {}
 
             for action in actions:
-                probs[state][action] = []
-                stage_rewards[state][action] = []
+                probs[state][action] = {}
+                stage_rewards[state][action] = {}
                 for i, j in next_states[state]:
-                    probs[state][action].append(grid_mdp.get_transition_prob(state, Action(action), (i, j)))  # type: ignore
-                    stage_rewards[state][action].append(grid_mdp.stage_reward(state, Action(action), (i, j)))  # type: ignore
+                    prob = grid_mdp.get_transition_prob(state, Action(action), (i, j))  # type: ignore
+                    if prob != 0:
+                        probs[state][action][(i, j)] = prob
+                        stage_rewards[state][action][(i, j)] = grid_mdp.stage_reward(state, Action(action), (i, j))  # type: ignore
+                if not probs[state][action]:
+                    del probs[state][action]
 
         while True:
-            delta = 0
             value_func = np.copy(new_value_func)
+            delta = 0
 
             for state in coordinate:
-                value_func_vect = np.zeros(6)  #######
-                for action in actions:
-                    if np.abs(sum(probs[state][action]) - 1) > 0.0001:
-                        value_func_vect[action] = -np.inf
-                    else:
-                        value_func_vect[action] = sum(
-                            probs[state][action][ind]
-                            * (stage_rewards[state][action][ind] + grid_mdp.gamma * value_func[next_states[state][ind]])
-                            for ind in range(len(next_states[state]))
-                        )
+                # print(state)
+                value_func_vect = {}
+                for action in probs[state]:
+                    prob = probs[state][action]
+                    reward = stage_rewards[state][action]
+                    value_func_vect[action] = sum(
+                        prob[next_state] * (reward[next_state] + grid_mdp.gamma * value_func[next_state])
+                        for next_state in prob
+                    )
 
-                new_value_func[state] = np.max(value_func_vect)
-                policy[state] = np.argmax(value_func_vect)
+                new_value_func[state] = max(value_func_vect.values())
+                policy[state] = max(value_func_vect, key=value_func_vect.get)  # type: ignore
                 delta = max(delta, np.abs(new_value_func[state] - value_func[state]))
 
-            if delta < 0.01:
+            if delta < 0.1:
                 break
 
         return new_value_func, policy
