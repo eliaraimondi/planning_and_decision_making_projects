@@ -79,19 +79,19 @@ class PolicyIteration(GridMdpSolver):
                         for next_state in prob
                     )
                     delta = max(delta, np.abs(new_value_func[state] - value_func[state]))
-                if delta < 0.2:
+                if delta < 0.1:
                     break
 
             # policy improvement
             for state in coordinate:
-                value_func_vect = {}
-                for action in probs[state]:
-                    prob = probs[state][action]
-                    reward = stage_rewards[state][action]
-                    value_func_vect[action] = sum(
-                        prob[next_state] * (reward[next_state] + grid_mdp.gamma * new_value_func[next_state])
-                        for next_state in prob
+                value_func_vect = {
+                    action: sum(
+                        probs[state][action][next_state]
+                        * (stage_rewards[state][action][next_state] + grid_mdp.gamma * value_func[next_state])
+                        for next_state in probs[state][action]
                     )
+                    for action in probs[state]
+                }
                 new_policy[state] = max(value_func_vect, key=value_func_vect.get)  # type: ignore
 
             if np.array_equal(policy, new_policy):
