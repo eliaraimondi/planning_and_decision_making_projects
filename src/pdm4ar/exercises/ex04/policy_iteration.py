@@ -79,7 +79,7 @@ class PolicyIteration(GridMdpSolver):
                         for next_state in prob
                     )
                     delta = max(delta, np.abs(new_value_func[state] - value_func[state]))
-                if delta < 0.1:
+                if delta < 0.05:
                     break
 
             # policy improvement
