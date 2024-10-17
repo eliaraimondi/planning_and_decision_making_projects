@@ -28,6 +28,8 @@ class ValueIteration(GridMdpSolver):
         next_states = {}
 
         for state in coordinate:
+            if grid_mdp.grid[state] == 0:
+                new_value_func[state] = 500
             # define next_states
             if grid_mdp.grid[state] == 0:
                 next_states[state] = [state]
@@ -61,14 +63,17 @@ class ValueIteration(GridMdpSolver):
                     del probs[state][action]
 
         while True:
+            coordinates_with_values = [(coord, new_value_func[coord[0], coord[1]]) for coord in coordinate]
+            coordinates_sorted = sorted(coordinates_with_values, key=lambda x: x[1])
+            sorted_coordinates = [coord for coord, value in coordinates_sorted]
             value_func = np.copy(new_value_func)
             delta = 0
 
-            for state in coordinate:
+            for state in sorted_coordinates:
                 value_func_vect = {
                     action: sum(
                         probs[state][action][next_state]
-                        * (stage_rewards[state][action][next_state] + grid_mdp.gamma * value_func[next_state])
+                        * (stage_rewards[state][action][next_state] + grid_mdp.gamma * new_value_func[next_state])
                         for next_state in probs[state][action]
                     )
                     for action in probs[state]
