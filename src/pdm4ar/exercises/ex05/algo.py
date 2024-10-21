@@ -4,10 +4,6 @@ from tracemalloc import start
 
 from dg_commons import SE2Transform
 import math
-import matplotlib
-
-matplotlib.use("TkAgg")
-import matplotlib.pyplot as plt
 
 from pdm4ar.exercises.ex05.structures import *
 from pdm4ar.exercises_def.ex05.utils import extract_path_points
@@ -167,13 +163,9 @@ def calculate_dubins_path(start_config: SE2Transform, end_config: SE2Transform, 
             init = segment.start_config
             segment.start_config = segment.end_config
             segment.end_config = init
-        """min_path[0].end_config.theta += math.pi
-        min_path[1].start_config.theta += math.pi
-        min_path[1].end_config.theta += math.pi
-        min_path[0].start_config.theta += math.pi"""
         min_path = min_path[::-1]
 
-    return min_path
+    return min_path  # type: ignore
 
 
 def calculate_reeds_shepp_path(start_config: SE2Transform, end_config: SE2Transform, radius: float) -> Path:
@@ -259,20 +251,6 @@ def LRL_path(start_config: SE2Transform, end_config: SE2Transform, radius: float
             length_down += segment.length
     else:
         length_down = np.inf
-
-    """print(
-        start_circle.center,
-        start_circle.radius,
-        "     ",
-        middle_circle_up.center,
-        middle_circle_up.radius,
-        "     ",
-        middle_circle_down.center,
-        middle_circle_down.radius,
-        "     ",
-        end_circle.center,
-        end_circle.radius,
-    )"""
 
     if length_up < length_down:
         return path_up
@@ -375,61 +353,6 @@ def LSR_path(start_config: SE2Transform, end_config: SE2Transform, radius: float
     # Set the angles for the circles
     for circle in [start_circle, end_circle]:
         set_circle_angle(circle)
-
-    """print(
-        start_circle.center,
-        start_circle.radius,
-        "     ",
-        line.start_config,
-        line.end_config,
-        "     ",
-        end_circle.center,
-        end_circle.radius,
-    )"""
-
-    """centro = start_circle.center.p
-    raggio = start_circle.radius
-
-    theta = np.linspace(0, 2 * np.pi, 100)  # 100 punti per tracciare la circonferenza
-    x_circonferenza_1 = centro[0] + raggio * np.cos(theta)
-    y_circonferenza_1 = centro[1] + raggio * np.sin(theta)
-
-    centro = end_circle.center.p
-    raggio = end_circle.radius
-
-    theta = np.linspace(0, 2 * np.pi, 100)  # 100 punti per tracciare la circonferenza
-    x_circonferenza_2 = centro[0] + raggio * np.cos(theta)
-    y_circonferenza_2 = centro[1] + raggio * np.sin(theta)
-
-    punto_iniziale = line.start_config.p
-    punto_finale = line.end_config.p
-
-    # Coordinate della linea
-    x_linea = [punto_iniziale[0], punto_finale[0]]
-    y_linea = [punto_iniziale[1], punto_finale[1]]
-
-    # Creare il grafico
-    plt.figure(figsize=(6, 6))
-
-    # Plottare la circonferenza
-    plt.plot(x_circonferenza_1, y_circonferenza_1, label="Circonferenza_start", color="blue")
-
-    # Plottare la circonferenza
-    plt.plot(x_circonferenza_2, y_circonferenza_2, label="Circonferenza_end", color="green")
-
-    # Plottare la linea
-    plt.plot(x_linea, y_linea, label="Linea", color="red")
-
-    # Impostare lo stesso rapporto d'aspetto per gli assi
-    plt.gca().set_aspect("equal", adjustable="box")
-
-    # Aggiungere titolo e legende
-    plt.title("Circonferenza e Linea")
-    plt.legend()
-
-    # Mostrare il grafico
-    plt.grid(True)
-    plt.show()"""
 
     return [start_circle, line, end_circle]
 
