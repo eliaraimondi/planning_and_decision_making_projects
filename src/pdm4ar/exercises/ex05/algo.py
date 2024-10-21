@@ -122,9 +122,6 @@ def calculate_dubins_path(start_config: SE2Transform, end_config: SE2Transform, 
     # Please keep segments with zero length in the return list & return a valid dubins path!
     possible_solutions = possible_solutions_func(start_config, end_config, radius)
 
-    min_path = Path(
-        [Line(start_config, start_config), Line(start_config, start_config), Line(start_config, start_config)]
-    )
     # Compute the path for each possible solution
     min_length = np.inf
     for solution in possible_solutions:
