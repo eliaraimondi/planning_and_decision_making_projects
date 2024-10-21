@@ -122,6 +122,9 @@ def calculate_dubins_path(start_config: SE2Transform, end_config: SE2Transform, 
     # Please keep segments with zero length in the return list & return a valid dubins path!
     possible_solutions = possible_solutions_func(start_config, end_config, radius)
 
+    min_path = Path(
+        [Line(start_config, start_config), Line(start_config, start_config), Line(start_config, start_config)]
+    )
     # Compute the path for each possible solution
     min_length = np.inf
     for solution in possible_solutions:
@@ -156,7 +159,7 @@ def calculate_dubins_path(start_config: SE2Transform, end_config: SE2Transform, 
         # Take the path with the minimum length
         if length < min_length:
             min_length = length
-            min_path = path
+            min_path = Path(path)
 
     # If the path is inverse, inverte the list and set the gear in the opposite sense
     if inv:
@@ -165,9 +168,9 @@ def calculate_dubins_path(start_config: SE2Transform, end_config: SE2Transform, 
             init = segment.start_config
             segment.start_config = segment.end_config
             segment.end_config = init
-        min_path = min_path[::-1]
+        min_path = Path(min_path[::-1])
 
-    return min_path  # type: ignore
+    return min_path
 
 
 def calculate_reeds_shepp_path(start_config: SE2Transform, end_config: SE2Transform, radius: float) -> Path:
