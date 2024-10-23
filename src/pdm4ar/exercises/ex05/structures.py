@@ -79,7 +79,7 @@ class Line(Segment):
     """
 
     def __init__(self, start_config: SE2Transform, end_config: SE2Transform, gear: Gear = Gear.FORWARD):
-        self.length = np.linalg.norm(end_config.p - start_config.p)  # type: ignore
+        self.length = np.linalg.norm(end_config.p - start_config.p)
         if np.abs(self.length) >= 1e-8:
             self.direction = (end_config.p - start_config.p) / self.length
         else:

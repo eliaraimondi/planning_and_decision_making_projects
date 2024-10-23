@@ -84,12 +84,15 @@ def calculate_tangent_btw_circles(circle_start: Curve, circle_end: Curve) -> lis
     # Consider the cases of RR or LL
     if circle_start.type == circle_end.type:
         delta_x, delta_y = circle_end.center.p - circle_start.center.p
+        if delta_x == 0 and delta_y == 0:
+            return []
         dir_OH = np.array([-delta_y, delta_x]) * 1 / np.sqrt(delta_y**2 + delta_x**2)
+
         if circle_start.type == DubinsSegmentType.LEFT:
             dir_OH = -dir_OH
         theta = tan_computation(delta_x, delta_y)
         H = SE2Transform(circle_start.center.p + circle_start.radius * dir_OH, theta)
-        H_first = SE2Transform(H.p + np.array([delta_x, delta_y]), theta)  # type: ignore
+        H_first = SE2Transform(H.p + circle_end.center.p - circle_start.center.p, theta)  # type: ignore
         tangent = [Line(H, H_first)]
 
     # Consider the cases RL or LR
@@ -97,6 +100,7 @@ def calculate_tangent_btw_circles(circle_start: Curve, circle_end: Curve) -> lis
         centers_line = circle_end.center.p - circle_start.center.p
         len_OC = np.linalg.norm(centers_line) / 2
         gamma = tan_computation(centers_line[0], centers_line[1])
+
         # Considering different tangentes if start circle is RIGHT or LEFT
         if circle_start.type == DubinsSegmentType.RIGHT:
             theta = math.acos(circle_start.radius / len_OC) + gamma
@@ -120,7 +124,7 @@ def calculate_tangent_btw_circles(circle_start: Curve, circle_end: Curve) -> lis
 def calculate_dubins_path(start_config: SE2Transform, end_config: SE2Transform, radius: float, inv=False) -> Path:
     # TODO implement here your solution
     # Please keep segments with zero length in the return list & return a valid dubins path!
-    possible_solutions = possible_solutions_func(start_config, end_config, radius)
+    possible_solutions = ["LRL", "RLR", "LSL", "LSR", "RSL", "RSR"]
 
     min_path = [Line(start_config, start_config), Line(start_config, start_config), Line(start_config, start_config)]
     # Compute the path for each possible solution
@@ -196,29 +200,26 @@ def calculate_reeds_shepp_path(start_config: SE2Transform, end_config: SE2Transf
         return dubins_path_inv
 
 
-def possible_solutions_func(start_config: SE2Transform, end_config: SE2Transform, radius: float):
-    possible_solutions = ["LRL", "RLR", "LSL", "LSR", "RSL", "RSR"]
-
-    # Eliminate soluzions considering conditions on the radius
-    gs_distance = np.linalg.norm(start_config.p - end_config.p)
-    if gs_distance < 2 * radius:
-        possible_solutions.remove("LSR")
-        possible_solutions.remove("RSL")
-    if gs_distance > 4 * radius:
-        possible_solutions.remove("LRL")
-        possible_solutions.remove("RLR")
-
-    return possible_solutions
-
-
 def LRL_path(start_config: SE2Transform, end_config: SE2Transform, radius: float):
     start_circle_up = calculate_turning_circles(start_config, radius).left
     start_circle_down = calculate_turning_circles(start_config, radius).left
     end_circle_up = calculate_turning_circles(end_config, radius).left
     end_circle_down = calculate_turning_circles(end_config, radius).left
-    middle_circle_up, middle_circle_down = calculate_middle_circle(
-        start_circle_up.center.p, end_circle_up.center.p, radius, start_circle_up.type
-    )
+
+    if np.linalg.norm(start_config.p - end_config.p) > 4 * radius:
+        return []
+
+    if np.array_equal(start_circle_up.center.p, end_circle_up.center.p):
+        curve = Curve.create_circle(start_circle_up.center, start_config, radius, DubinsSegmentType.LEFT)
+        curve.end_config = end_config
+        curve_2 = Curve.create_circle(end_circle_up.center, end_config, radius, DubinsSegmentType.RIGHT)
+        curve_3 = Curve.create_circle(end_circle_up.center, end_config, radius, DubinsSegmentType.LEFT)
+        pathhh = [curve, curve_2, curve_3]
+        for circle in pathhh:
+            set_circle_angle(circle)
+        return pathhh
+
+    middle_circle_up, middle_circle_down = calculate_middle_circle(start_circle_up, end_circle_up)
 
     # Computations for middle_circle_up
     # Set end config of start circle
@@ -271,9 +272,21 @@ def RLR_path(start_config: SE2Transform, end_config: SE2Transform, radius: float
     start_circle_down = calculate_turning_circles(start_config, radius).right
     end_circle_up = calculate_turning_circles(end_config, radius).right
     end_circle_down = calculate_turning_circles(end_config, radius).right
-    middle_circle_up, middle_circle_down = calculate_middle_circle(
-        start_circle_up.center.p, end_circle_up.center.p, radius, start_circle_up.type
-    )
+
+    if np.linalg.norm(start_config.p - end_config.p) > 4 * radius:
+        return []
+
+    if np.array_equal(start_circle_up.center.p, end_circle_up.center.p):
+        curve = Curve.create_circle(start_circle_up.center, start_config, radius, DubinsSegmentType.RIGHT)
+        curve.end_config = end_config
+        curve_2 = Curve.create_circle(end_circle_up.center, end_config, radius, DubinsSegmentType.LEFT)
+        curve_3 = Curve.create_circle(end_circle_up.center, end_config, radius, DubinsSegmentType.RIGHT)
+        pathhh = [curve, curve_2, curve_3]
+        for circle in pathhh:
+            set_circle_angle(circle)
+        return pathhh
+
+    middle_circle_up, middle_circle_down = calculate_middle_circle(start_circle_up, end_circle_up)
 
     # Computations for middle_circle_up
     # Set end config of start circle
@@ -409,7 +422,11 @@ def RSR_path(start_config: SE2Transform, end_config: SE2Transform, radius: float
     return [start_circle, line, end_circle]
 
 
-def calculate_middle_circle(center_start_circle, center_end_circle, radius, dir_circles) -> list[Curve]:
+def calculate_middle_circle(start_circle: Curve, end_circle: Curve) -> list[Curve]:
+    center_end_circle = end_circle.center.p
+    center_start_circle = start_circle.center.p
+    radius = start_circle.radius
+    dir_circles = start_circle.type
 
     # Calculate direction of centers_line axis
     centers_line = center_end_circle - center_start_circle
@@ -435,7 +452,7 @@ def calculate_middle_circle(center_start_circle, center_end_circle, radius, dir_
     ang_tang_point = tan_computation(dir_OfirstOsecond_up[0], dir_OfirstOsecond_up[1]) - math.pi / 2
     if dir_circ == DubinsSegmentType.RIGHT:
         ang_tang_point += math.pi
-    tang_point_up = SE2Transform(center_end_circle + dir_OfirstOsecond_up * radius, ang_tang_point)
+    tang_point_up = SE2Transform(tuple(center_end_circle + dir_OfirstOsecond_up * radius), ang_tang_point)
 
     # Find tangent point between middle_down and end circles
     dir_OfirstOsecond_down = center_middle_circle_down.p - center_end_circle
@@ -443,7 +460,7 @@ def calculate_middle_circle(center_start_circle, center_end_circle, radius, dir_
     ang_tang_point = tan_computation(dir_OfirstOsecond_down[0], dir_OfirstOsecond_down[1]) - math.pi / 2
     if dir_circ == DubinsSegmentType.RIGHT:
         ang_tang_point += math.pi
-    tang_point_down = SE2Transform(center_end_circle + dir_OfirstOsecond_down * radius, ang_tang_point)
+    tang_point_down = SE2Transform(tuple(center_end_circle + dir_OfirstOsecond_down * radius), ang_tang_point)
 
     # Define the two middle cirlces
     middle_circle_up = Curve.create_circle(center_middle_circle_up, tang_point_up, radius, dir_circ)
@@ -455,7 +472,7 @@ def calculate_middle_circle(center_start_circle, center_end_circle, radius, dir_
     ang_tang_point = tan_computation(dir_OOsecond[0], dir_OOsecond[1]) - math.pi / 2
     if dir_circ == DubinsSegmentType.RIGHT:
         ang_tang_point += math.pi
-    tang_point_up = SE2Transform(center_start_circle + dir_OOsecond * radius, ang_tang_point)
+    tang_point_up = SE2Transform(tuple(center_start_circle + dir_OOsecond * radius), ang_tang_point)
 
     # Find tangent point between middle_down and start circles
     dir_OOsecond = center_middle_circle_down.p - center_start_circle
@@ -463,7 +480,7 @@ def calculate_middle_circle(center_start_circle, center_end_circle, radius, dir_
     ang_tang_point = tan_computation(dir_OOsecond[0], dir_OOsecond[1]) - math.pi / 2
     if dir_circ == DubinsSegmentType.RIGHT:
         ang_tang_point += math.pi
-    tang_point_down = SE2Transform(center_start_circle + dir_OOsecond * radius, ang_tang_point)
+    tang_point_down = SE2Transform(tuple(center_start_circle + dir_OOsecond * radius), ang_tang_point)
 
     # Set start config of circles
     middle_circle_up.start_config = tang_point_up
@@ -476,7 +493,11 @@ def set_circle_angle(circle: Curve):
     radius_1 = circle.start_config.p - circle.center.p
     radius_2 = circle.end_config.p - circle.center.p
     cos_ang = np.dot(radius_1, radius_2) / (np.linalg.norm(radius_1) * np.linalg.norm(radius_2))
-    arc_angle = math.acos(cos_ang)  ######### find a solution for angles > 180
+
+    cos_ang = correct_approximation(cos_ang, 1.0)
+    cos_ang = correct_approximation(cos_ang, -1.0)
+
+    arc_angle = math.acos(cos_ang)
     cross = np.cross(radius_1, radius_2)
     if (cross < 0 and circle.type == DubinsSegmentType.LEFT) or (cross > 0 and circle.type == DubinsSegmentType.RIGHT):
         arc_angle = 2 * np.pi - arc_angle
@@ -490,3 +511,9 @@ def tan_computation(delta_x: float, delta_y: float) -> float:
         return math.pi / 2
     else:
         return math.pi * 1.5
+
+
+def correct_approximation(value: float, target: float, tolerance: float = 1e-5) -> float:
+    if np.isclose(value, target, atol=tolerance):
+        return target
+    return value
