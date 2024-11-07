@@ -156,7 +156,7 @@ class CollisionChecker:
         max_y = [robot_position.bounds[3] for robot_position in robot_positions]
 
         # 2. Create the grid
-        num_cells = 50**2
+        num_cells = 40**2
         cells = [[] for _ in range(len(robot_positions))]
         for count, robot_position in enumerate(robot_positions):
             cells[count] = [
