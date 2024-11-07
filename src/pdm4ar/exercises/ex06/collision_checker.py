@@ -1,5 +1,9 @@
+from hmac import new
+from random import sample
 from typing import List
 from dg_commons import SE2Transform
+import numpy as np
+from pyparsing import C
 from pdm4ar.exercises.ex06.collision_primitives import (
     CollisionPrimitives,
     CollisionPrimitives_SeparateAxis,
@@ -37,6 +41,9 @@ COLLISION_PRIMITIVES = {
     Circle: {
         Point: CollisionPrimitives.circle_point_collision,
         Segment: CollisionPrimitives.circle_segment_collision,
+        Polygon: CollisionPrimitives.circle_polygon_collision,
+        Triangle: CollisionPrimitives.circle_triangle_collision,
+        Circle: CollisionPrimitives.circle_circle_collision,
     },
     Polygon: {
         Point: CollisionPrimitives.polygon_point_collision,
@@ -51,12 +58,10 @@ def check_collision(p_1: GeoPrimitive, p_2: GeoPrimitive) -> bool:
     Note that this function only uses the functions that you implemented in CollisionPrimitives class.
         Parameters:
                 p_1 (GeoPrimitive): Geometric Primitive
-                p_w (GeoPrimitive): Geometric Primitive
+                p_2 (GeoPrimitive): Geometric Primitive
     """
     assert type(p_1) in COLLISION_PRIMITIVES, "Collision primitive does not exist."
-    assert (
-        type(p_2) in COLLISION_PRIMITIVES[type(p_1)]
-    ), "Collision primitive does not exist."
+    assert type(p_2) in COLLISION_PRIMITIVES[type(p_1)], f"Collision primitive does not exist. {type(p_2)}"
 
     collision_func = COLLISION_PRIMITIVES[type(p_1)][type(p_2)]
 
@@ -101,9 +106,7 @@ class CollisionChecker:
     def __init__(self):
         pass
 
-    def path_collision_check(
-        self, t: Path, r: float, obstacles: list[GeoPrimitive]
-    ) -> list[int]:
+    def path_collision_check(self, t: Path, r: float, obstacles: list[GeoPrimitive]) -> list[int]:
         """
         Returns the indices of collided line segments.
         Note that index of first line segment is 0 and last line segment is len(t.waypoints)-1.
@@ -114,11 +117,21 @@ class CollisionChecker:
                     obstacles (list[GeoPrimitive]): list of obstacles as GeoPrimitives
                     Please note that only Triangle, Circle and Polygon exist in this list
         """
-        return []
+        collided_segments_ind = []
 
-    def path_collision_check_occupancy_grid(
-        self, t: Path, r: float, obstacles: list[GeoPrimitive]
-    ) -> list[int]:
+        # Consider all obstacles
+        for obstacle in obstacles:
+            for i in range(len(t.waypoints) - 1):
+                # For each segment of the path, sample points and check collision between robot centered in point and obstacle
+                segment = Segment(t.waypoints[i], t.waypoints[i + 1])
+                points = CollisionPrimitives.sample_segment(segment)
+                for point in points:
+                    robot = Circle(point, r)
+                    if check_collision(robot, obstacle) and i not in collided_segments_ind:
+                        collided_segments_ind.append(i)
+        return collided_segments_ind
+
+    def path_collision_check_occupancy_grid(self, t: Path, r: float, obstacles: list[GeoPrimitive]) -> list[int]:
         """
         Returns the indices of collided line segments.
         Note that index of first line segment is 0 and last line segment is len(t.waypoints)-1
@@ -132,11 +145,49 @@ class CollisionChecker:
                     obstacles (list[GeoPrimitive]): list of obstacles as GeoPrimitives
                     Please note that only Triangle, Circle and Polygon exist in this list
         """
-        return []
+        # Compute the positions of the robot during the path
+        robot_positions = self.robot_positions(t, 1.3 * r)
 
-    def path_collision_check_r_tree(
-        self, t: Path, r: float, obstacles: list[GeoPrimitive]
-    ) -> list[int]:
+        # Create the grid
+        # 1. Find the boundaries of each robot position
+        min_x = [robot_position.bounds[0] for robot_position in robot_positions]
+        max_x = [robot_position.bounds[2] for robot_position in robot_positions]
+        min_y = [robot_position.bounds[1] for robot_position in robot_positions]
+        max_y = [robot_position.bounds[3] for robot_position in robot_positions]
+
+        # 2. Create the grid
+        num_cells = 50**2
+        cells = [[] for _ in range(len(robot_positions))]
+        for count, robot_position in enumerate(robot_positions):
+            cells[count] = [
+                shapely.box(
+                    min_x[count] + i * (max_x[count] - min_x[count]) / np.sqrt(num_cells),
+                    min_y[count] + j * (max_y[count] - min_y[count]) / np.sqrt(num_cells),
+                    min_x[count] + (i + 1) * (max_x[count] - min_x[count]) / np.sqrt(num_cells),
+                    min_y[count] + (j + 1) * (max_y[count] - min_y[count]) / np.sqrt(num_cells),
+                )
+                for i, j in np.ndindex(int(np.sqrt(num_cells)), int(np.sqrt(num_cells)))
+            ]
+        # 3. Assign the occupancy of each cell
+        shapely_obstacles = [geo_primitive_to_shapely(obstacle) for obstacle in obstacles]
+        occuped_cells = [[] for _ in range(len(cells))]
+        for i, seg in enumerate(cells):
+            for cell in seg:
+                if np.any(shapely.intersects(cell, shapely_obstacles)):
+                    occuped_cells[i].append(cell)
+
+        # Compute the positions of the robot during the path
+        robot_positions = self.robot_positions(t, r)
+
+        # Check if the robot intersects with any occupied cell
+        collided_segments_ind = []
+        for i, robot_position in enumerate(robot_positions):
+            if any([robot_position.intersects(cell) for cell in occuped_cells[i]]):
+                collided_segments_ind.append(i)
+
+        return collided_segments_ind
+
+    def path_collision_check_r_tree(self, t: Path, r: float, obstacles: list[GeoPrimitive]) -> list[int]:
         """
         Returns the indices of collided line segments.
         Note that index of first line segment is 0 and last line segment is len(t.waypoints)-1
@@ -150,7 +201,25 @@ class CollisionChecker:
                     obstacles (List[GeoPrimitive]): List of obstacles as GeoPrimitives
                     Please note that only Triangle, Circle and Polygon exist in this list
         """
-        return []
+        # Convert obstacles to shapely objects and build the R-Tree
+        shapely_obstacles = [geo_primitive_to_shapely(obstacle) for obstacle in obstacles]
+        r_tree = shapely.strtree.STRtree(shapely_obstacles)
+
+        # Compute the positions of the robot during the path
+        robot_positions = self.robot_positions(t, r)
+
+        # Check if the robot intersects with any obstacle
+        collided_segments_ind = []
+        for i, robot_position in enumerate(robot_positions):
+            # Query the R-Tree for potential collisions
+            potential_collisions = r_tree.query(robot_position)
+
+            # Check if the robot intersects with any obstacle
+            for obstacle in potential_collisions:
+                if robot_position.intersects(shapely_obstacles[obstacle]):
+                    collided_segments_ind.append(i)
+
+        return collided_segments_ind
 
     def collision_check_robot_frame(
         self,
@@ -169,11 +238,41 @@ class CollisionChecker:
                     observed_obstacles (List[GeoPrimitive]): List of obstacles as GeoPrimitives in robot frame
                     Please note that only Triangle, Circle and Polygon exist in this list
         """
+        # Convert the obstacles to the world frame
+        # 1. Consider the rotation matrix
+        rotation_matrix = np.array(
+            [
+                [np.cos(current_pose.theta), -np.sin(current_pose.theta), 0],
+                [np.sin(current_pose.theta), np.cos(current_pose.theta), 0],
+                [0, 0, 1],
+            ]
+        )
+        # 2. Apply the rotation matrix to the obstacles
+        obstacles = []
+        for obstacle in observed_obstacles:
+            if isinstance(obstacle, Triangle):
+                obstacle = CollisionPrimitives.convert_triangle_to_polygon(obstacle)
+            if isinstance(obstacle, Circle):
+                center = obstacle.center.apply_SE2transform(rotation_matrix)
+                new_center = np.array([center.x, center.y]) + np.array([current_pose.p[0], current_pose.p[1]])
+                obstacles.append(Circle(Point(new_center[0], new_center[1]), obstacle.radius))
+            if isinstance(obstacle, Polygon):
+                obstacle_trasformed = obstacle.apply_SE2transform(rotation_matrix)
+                new_vertices = []
+                for v in obstacle_trasformed.vertices:
+                    x = v.x + current_pose.p[0]
+                    y = v.y + current_pose.p[1]
+                    new_vertices.append(Point(x, y))
+                obstacles.append(Polygon(new_vertices))
+
+        collision_checker = CollisionChecker()
+        if collision_checker.path_collision_check_r_tree(
+            Path([Point(current_pose.p[0], current_pose.p[1]), Point(next_pose.p[0], next_pose.p[1])]), r, obstacles
+        ):
+            return True
         return False
 
-    def path_collision_check_safety_certificate(
-        self, t: Path, r: float, obstacles: list[GeoPrimitive]
-    ) -> list[int]:
+    def path_collision_check_safety_certificate(self, t: Path, r: float, obstacles: list[GeoPrimitive]) -> list[int]:
         """
         Returns the indices of collided line segments.
         Note that index of first line segment is 0 and last line segment is len(t.waypoints)-1
@@ -189,4 +288,37 @@ class CollisionChecker:
                     obstacles (list[GeoPrimitive]): list of obstacles as GeoPrimitives
                     Please note that only Triangle, Circle and Polygon exist in this list
         """
-        return []
+        collision_indices = []
+
+        # Sample points on the path
+        points = [[] for _ in range(len(t.waypoints) - 1)]
+        for i in range(len(t.waypoints) - 1):
+            segment = Segment(t.waypoints[i], t.waypoints[i + 1])
+            points[i] = CollisionPrimitives.sample_segment(segment)
+
+        for i, segment_points in enumerate(points):
+            for point in segment_points:
+                # Compute the min distance between the point and the obstacles
+                distance = min(
+                    geo_primitive_to_shapely(obstacle).distance(geo_primitive_to_shapely(point))
+                    for obstacle in obstacles
+                )
+                if distance < r and i not in collision_indices:
+                    collision_indices.append(i)
+
+        return collision_indices
+
+    def robot_positions(self, t: Path, r: float) -> List[shapely.geometry.base.BaseGeometry]:
+        """
+        Returns the positions of the robot during the path.
+
+            Parameters:
+                    t (Path): Path of circular differential drive robot
+                    r (float): Radius of circular differential drive robot
+        """
+        robot_positions = []
+        for i in range(len(t.waypoints) - 1):
+            segment = Segment(t.waypoints[i], t.waypoints[i + 1])
+            segment_line = geo_primitive_to_shapely(segment)
+            robot_positions.append(segment_line.buffer(r))
+        return robot_positions
