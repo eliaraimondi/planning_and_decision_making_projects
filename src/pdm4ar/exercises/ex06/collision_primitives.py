@@ -268,7 +268,7 @@ class CollisionPrimitives:
     Class of collision primitives
     """
 
-    NUMBER_OF_SAMPLES = 40
+    NUMBER_OF_SAMPLES = 10
 
     @staticmethod
     def circle_point_collision(c: Circle, p: Point) -> bool:
