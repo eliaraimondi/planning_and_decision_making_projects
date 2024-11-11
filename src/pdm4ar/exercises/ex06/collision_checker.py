@@ -290,7 +290,7 @@ class CollisionChecker:
         """
         collision_indices = []
 
-        # Sample points on the path
+        """# Sample points on the path
         points = [[] for _ in range(len(t.waypoints) - 1)]
         for i in range(len(t.waypoints) - 1):
             segment = Segment(t.waypoints[i], t.waypoints[i + 1])
@@ -304,7 +304,42 @@ class CollisionChecker:
                     for obstacle in obstacles
                 )
                 if distance < r and i not in collision_indices:
+                    collision_indices.append(i)"""
+        # Trasform the obstacles to shapely objects
+        shapely_obstacles = [geo_primitive_to_shapely(obstacle) for obstacle in obstacles]
+
+        points = [[] for _ in range(len(t.waypoints) - 1)]
+        for i in range(len(t.waypoints) - 1):
+            segment = Segment(t.waypoints[i], t.waypoints[i + 1])
+            points[i] = CollisionPrimitives.sample_segment(segment)
+
+        for i, segment_points in enumerate(points):
+            S_free = []
+            S_obs = []
+            Dist = {}
+            for point in segment_points:
+                x_q = shapely.Point(point.x, point.y)
+                if S_free:
+                    x_free = S_free[np.argmin([shapely.distance(x_q, x) for x in S_free])]
+                    if shapely.distance(x_q, x_free) <= Dist[x_free]:
+                        continue
+                if S_obs:
+                    x_obs = S_obs[np.argmin([shapely.distance(x_q, x) for x in S_obs])]
+                    if S_obs and i not in collision_indices and shapely.distance(x_q, x_obs) <= Dist[x_obs]:
+                        collision_indices.append(i)
+                        break
+
+                d_obs = min([shapely.distance(x_q, obstacle.exterior) for obstacle in shapely_obstacles])
+                if d_obs > r:
+                    S_free.append(x_q)
+                    Dist[x_q] = d_obs - r
+                elif d_obs <= r and i not in collision_indices:
                     collision_indices.append(i)
+                    S_obs.append(x_q)
+                    Dist[x_q] = d_obs - r
+                else:
+                    S_obs.append(x_q)
+                    Dist[x_q] = d_obs - r
 
         return collision_indices
 
